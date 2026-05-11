@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Student App</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 16px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 8px;
+            border-bottom: 1px solid #ccc;
+            cursor: pointer;
+        }
+
+        li:hover {
+            background-color: #f0f0f0;
+        }
+
+        .form-container {
+            display: none;
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        input {
+            display: block;
+            margin-bottom: 10px;
+            width: 95%;
+            padding: 8px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin-right: 5px;
+        }
+
+        .error {
+            color: red;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Students</h1>
+    <ul id="student-list"></ul>
+    <button onclick="showAddForm()">Add New Student</button>
+
+    <!-- Add Student Form -->
+    <div id="add-form" class="form-container">
+        <h2>Add Student</h2>
+        <p id="add-error" class="error" style="display: none;"></p>
+        <label for="add-name">Student Name:</label>
+        <input type="text" id="add-name" placeholder="Name">
+        <label for="add-grade">Grade:</label>
+        <input type="number" id="add-grade" placeholder="Grade">
+        <button onclick="addStudent()">Save</button>
+        <button onclick="hideForms()">Cancel</button>
+    </div>
+
+    <!-- Edit Student Form -->
+    <div id="edit-form" class="form-container">
+        <h2>Edit Student</h2>
+        <p id="edit-error" class="error" style="display: none;"></p>
+        <input type="hidden" id="edit-id">
+        <label for="edit-name">Student Name:</label>
+        <input type="text" id="edit-name" placeholder="Name">
+        <label for="edit-grade">Grade:</label>
+        <input type="number" id="edit-grade" placeholder="Grade">
+        <button onclick="updateStudent()">Update</button>
+        <button onclick="deleteStudent()">Delete</button>
+        <button onclick="hideForms()">Cancel</button>
+    </div>
+
+    <script>
+        // --- DATA LAYER: Repository ---
+        class StudentRepository {
+            constructor() {
+                this.STORAGE_KEY = 'student_app_data';
+
+                const savedData = localStorage.getItem(this.STORAGE_KEY);
+
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        this.students = parsed.students || [];
+                        this.nextId = parsed.nextId || 1;
+                    } catch (e) {
+                        console.error("Failed to load data", e);
+                        this._loadDefaults();
+                    }
+                } else {
+                    this._loadDefaults();
+                }
+            }
+
+            _loadDefaults() {
+                this.students = [
+                    { id: 1, name: "Marius", grade: 55.5 },
+                    { id: 2, name: "Bob", grade: 88.0 },
+                    { id: 3, name: "Charles", grade: 99.9 }
+                ];
+                this.nextId = 4;
+                // Try to save defaults, but don't crash if it fails
+                try { this._save(); } catch (e) { console.warn("Could not save defaults"); }
+            }
+
+            _save() {
+                try {
+                    const dataToSave = {
+                        students: this.students,
+                        nextId: this.nextId
+                    };
+                    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(dataToSave));
+                } catch (e) {
+                    console.error("Persistence Error:", e);
+                    // Propagate error to be handled by ViewModel/UI
+                    throw new Error("Failed to save data! Storage might be full.");
+                }
+            }
+
+            getAll() {
+                return this.students;
+            }
+
+            getById(id) {
+                return this.students.find(s => s.id === id);
+            }
+
+            add(name, grade) {
+                const newStudent = { id: this.nextId++, name: name, grade: grade };
+                this.students.push(newStudent);
+                this._save(); // Can throw
+                return newStudent;
+            }
+
+            update(id, name, grade) {
+                const student = this.students.find(s => s.id === id);
+                if (student) {
+                    student.name = name;
+                    student.grade = grade;
+                    this._save(); // Can throw
+                    return student;
+                }
+                return null;
+            }
+
+            delete(id) {
+                const index = this.students.findIndex(s => s.id === id);
+                if (index !== -1) {
+                    this.students.splice(index, 1);
+                    this._save(); // Can throw
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // --- DOMAIN LAYER: ViewModel ---
+        class StudentViewModel {
+            constructor(repository) {
+                this.repository = repository;
+                // Callback hooks for UI
+                this.onStudentAdded = null;
+                this.onStudentUpdated = null;
+                this.onStudentDeleted = null;
+                this.onPersistenceError = null; // New error observer
+            }
+
+            loadStudents() {
+                return this.repository.getAll();
+            }
+
+            getStudent(id) {
+                return this.repository.getById(id);
+            }
+
+            addStudent(name, grade) {
+                try {
+                    const student = this.repository.add(name, grade);
+                    if (this.onStudentAdded) this.onStudentAdded(student);
+                    return true; // Success
+                } catch (e) {
+                    if (this.onPersistenceError) this.onPersistenceError(e.message);
+                    return false; // Failed
+                }
+            }
+
+            updateStudent(id, name, grade) {
+                try {
+                    const student = this.repository.update(id, name, grade);
+                    if (student && this.onStudentUpdated) this.onStudentUpdated(student);
+                    return true;
+                } catch (e) {
+                    if (this.onPersistenceError) this.onPersistenceError(e.message);
+                    return false;
+                }
+            }
+
+            deleteStudent(id) {
+                try {
+                    const success = this.repository.delete(id);
+                    if (success && this.onStudentDeleted) this.onStudentDeleted(id);
+                    return true;
+                } catch (e) {
+                    if (this.onPersistenceError) this.onPersistenceError(e.message);
+                    return false;
+                }
+            }
+        }
+
+        // --- UI LAYER ---
+        const addForm = document.getElementById('add-form');
+        const editForm = document.getElementById('edit-form');
+        const studentList = document.getElementById('student-list');
+        const addError = document.getElementById('add-error');
+        const editError = document.getElementById('edit-error');
+
+        // Initialize MVVM
+        const repository = new StudentRepository();
+        const viewModel = new StudentViewModel(repository);
+
+        // UI Helpers
+        function createStudentListItem(student) {
+            const listItem = document.createElement('li');
+            listItem.id = `student-${student.id}`; // IMPORTANT: Unique ID for granular updates
+            listItem.textContent = `Name: ${student.name}, Grade: ${student.grade}`;
+            listItem.onclick = () => showEditForm(student.id);
+            return listItem;
+        }
+
+        // Bind ViewModel Events (Granular Updates & Errors)
+        viewModel.onStudentAdded = (student) => {
+            const listItem = createStudentListItem(student);
+            studentList.appendChild(listItem); // Only append new item
+        };
+
+        viewModel.onStudentUpdated = (student) => {
+            const listItem = document.getElementById(`student-${student.id}`);
+            if (listItem) {
+                listItem.textContent = `Name: ${student.name}, Grade: ${student.grade}`;
+                listItem.onclick = () => showEditForm(student.id);
+            }
+        };
+
+        viewModel.onStudentDeleted = (id) => {
+            const listItem = document.getElementById(`student-${id}`);
+            if (listItem) {
+                listItem.remove(); // Only remove specific item
+            }
+        };
+
+        // Handle Persistence Errors
+        viewModel.onPersistenceError = (errorMessage) => {
+            // Show error in the currently active form
+            if (addForm.style.display === 'block') {
+                addError.textContent = errorMessage;
+                addError.style.display = 'block';
+            } else if (editForm.style.display === 'block') {
+                editError.textContent = errorMessage;
+                editError.style.display = 'block';
+            } else {
+                alert(errorMessage); // Fallback
+            }
+        };
+
+        // Initial Logic
+        function loadInitialData() {
+            studentList.innerHTML = '';
+            const students = viewModel.loadStudents();
+            students.forEach(student => {
+                const listItem = createStudentListItem(student);
+                studentList.appendChild(listItem);
+            });
+        }
+
+        // Form Logic
+        function showAddForm() {
+            hideForms();
+            addError.style.display = 'none';
+            addForm.style.display = 'block';
+        }
+
+        function showEditForm(studentId) {
+            const student = viewModel.getStudent(studentId);
+            if (student) {
+                hideForms();
+                editError.style.display = 'none';
+                document.getElementById('edit-id').value = student.id;
+                document.getElementById('edit-name').value = student.name;
+                document.getElementById('edit-grade').value = student.grade;
+                editForm.style.display = 'block';
+            }
+        }
+
+        function hideForms() {
+            addForm.style.display = 'none';
+            editForm.style.display = 'none';
+        }
+
+        function addStudent() {
+            const name = document.getElementById('add-name').value;
+            const grade = document.getElementById('add-grade').value;
+            const gradeNum = parseFloat(grade);
+
+            if (name && grade && !isNaN(gradeNum)) {
+                // Returns true if success, false if error (handled by onPersistenceError)
+                if (viewModel.addStudent(name, gradeNum)) {
+                    hideForms();
+                }
+            } else {
+                addError.textContent = 'Please enter a valid name and grade.';
+                addError.style.display = 'block';
+            }
+        }
+
+        function updateStudent() {
+            const id = parseInt(document.getElementById('edit-id').value);
+            const name = document.getElementById('edit-name').value;
+            const grade = document.getElementById('edit-grade').value;
+            const gradeNum = parseFloat(grade);
+
+            if (id && name && grade && !isNaN(gradeNum)) {
+                if (viewModel.updateStudent(id, name, gradeNum)) {
+                    hideForms();
+                }
+            } else {
+                editError.textContent = 'Please enter a valid name and grade.';
+                editError.style.display = 'block';
+            }
+        }
+
+        function deleteStudent() {
+            const id = parseInt(document.getElementById('edit-id').value);
+            if (confirm("Are you sure you want to delete this student?")) {
+                if (viewModel.deleteStudent(id)) {
+                    hideForms();
+                }
+            }
+        }
+
+        // Initial load
+        document.addEventListener("DOMContentLoaded", loadInitialData);
+    </script>
+</body>
+
+</html>

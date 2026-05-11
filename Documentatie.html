@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>Documentație ApexRoute</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        window.onload = function() {
+            mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            
+            var markdownSource = document.getElementById('markdown-source').textContent;
+            document.getElementById('content').innerHTML = marked.parse(markdownSource);
+            
+            // Post-process: convert mermaid code blocks to mermaid divs
+            document.querySelectorAll('code.language-mermaid').forEach(function(codeEl) {
+                var pre = codeEl.parentElement;
+                var div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = codeEl.textContent;
+                pre.replaceWith(div);
+            });
+            
+            mermaid.run({ nodes: document.querySelectorAll('.mermaid') });
+        };
+    </script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; max-width: 900px; margin: 40px auto; padding: 20px; color: #333; }
+        h1, h2, h3 { color: #222; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+        th { background-color: #f7f7f7; font-weight: bold; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: Consolas, monospace; }
+        code { background: #f4f4f4; padding: 2px 5px; border-radius: 4px; font-family: Consolas, monospace; }
+        .mermaid { text-align: center; margin: 30px 0; }
+        blockquote { border-left: 4px solid #F9A826; padding-left: 15px; color: #555; font-style: italic; margin-left: 0; }
+        @media print {
+            body { margin: 0; max-width: 100%; padding: 0; }
+            .mermaid { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div id="content"></div>
+    <script id="markdown-source" type="text/markdown">
+# Documentație Lucrare de Licență: ApexRoute
+
+## 1. Cuprinsul Lucrării (Tezei)
+> Această secțiune acoperă cerința: *Content of the thesis*.
+
+1. **Introducere**
+   1.1. Contextul și motivarea alegerii temei
+   1.2. Obiectivul principal al aplicației
+   1.3. Structura lucrării
+2. **Fundamente Teoretice și Tehnologii Utilizate**
+   2.1. Ecosistemul Android și Dezvoltarea Modernă
+   2.2. Algoritmi de Rutare în Rețele de Transport
+   2.3. Calculul Scorului de Plăcere Geografică
+3. **Analiza și Proiectarea Sistemului**
+   3.1. Arhitectura Software — Clean Architecture
+   3.2. Modelul de Navigație și Fluxul de Date
+   3.3. Diagrama de Cazuri de Utilizare
+   3.4. Stiva Tehnologică
+4. **Cerințe și Specificația Aplicației**
+   4.1. Descrierea Generală a Produsului
+   4.2. Cerințe Funcționale
+   4.3. Cerințe Non-Funcționale
+   4.4. Specificația Interfeței Utilizator
+   4.5. Specificația Structurii de Pachete
+   4.6. Paleta de Culori și Design
+5. **Detalii de Implementare**
+   5.1. Modelul de Date al Domeniului
+   5.2. Algoritmul A* Modificat cu Cost Hibrid de Plăcere
+   5.3. Generarea Traseului Circular — Multi-Rază cu Excludere de Muchii
+   5.4. Generarea Traseului Scenic A→B
+   5.5. Integrarea cu OpenStreetMap Overpass API
+   5.6. Integrarea Mapbox GL JS prin WebView
+   5.7. Geocodarea Adreselor cu Mapbox Geocoding API
+   5.8. Navigația Multi-Ecran cu Navigation Compose
+   5.9. Gestiunea Stării cu StateFlow și ViewModel
+   5.10. Implementarea Interfeței Grafice
+6. **Testare și Manual de Utilizare**
+   6.1. Testarea Funcțională
+   6.2. Verificarea Calității Buclei
+   6.3. Mini-Manual de Utilizare
+7. **Concluzii și Direcții Viitoare**
+   7.1. Rezumatul Realizărilor
+   7.2. Direcții Viitoare
+8. **Bibliografie**
+
+---
+
+## 2. Fundamente Teoretice și Tehnologii Utilizate
+> Această secțiune acoperă cerința: *Chapter theoretic 1 + subsections* și *Formatting: tables/images*.
+
+### 2.1 Ecosistemul Android și Dezvoltarea Modernă
+Dezvoltarea aplicațiilor mobile pentru sistemul de operare Android a evoluat semnificativ în ultimii ani. Tradițional, interfețele grafice erau construite folosind fișiere XML și manipulări imperative ale vederilor (*Views*) din codul Java sau Kotlin. Odată cu introducerea bibliotecii **Jetpack Compose**, paradigma a devenit una pur **declarativă**. 
+
+În Jetpack Compose, dezvoltatorul descrie *cum* ar trebui să arate interfața la o anumită stare a datelor, iar framework-ul se ocupă cu redesenarea inteligentă (*recomposition*) doar a componentelor afectate de modificările de stare. Kotlin, ca limbaj principal recomandat de Google, oferă suport extins pentru coroutine, facilitând astfel operațiile asincrone și managementul stărilor complexe necesare într-o aplicație de navigație.
+
+### 2.2 Algoritmi de Rutare în Rețele de Transport
+Pentru a putea naviga de la un punct A la un punct B pe o hartă, sistemele geografice modelează rețeaua stradală sub forma unui graf orientat $G = (V, E)$, unde $V$ reprezintă setul de noduri (intersecțiile), iar $E$ reprezintă setul de muchii (segmentele de stradă).
+
+Problema determinării celui mai bun traseu se reduce matematic la problema determinării drumului de cost minim între două noduri din graf. 
+Cei mai cunoscuți algoritmi pentru această problemă sunt **Dijkstra** și **A*** (A-Star). A* extinde algoritmul Dijkstra prin introducerea unei funcții euristice $h(n)$ care estimează costul de la nodul curent până la nodul destinație, ghidând căutarea direct spre țintă și reducând spațiul stărilor vizitate.
+
+**Tabelul 2.1:** Comparație între parametrii și comportamentul algoritmilor de rutare.
+
+| Caracteristică | Algoritmul Dijkstra | Algoritmul A* (A-Star) |
+| :--- | :--- | :--- |
+| **Găsirea Rutei Optime** | Da (garantează costul minim) | Da (dacă euristica este admisibilă) |
+| **Funcție Euristică** | Nu folosește ($h(n) = 0$) | Folosește estimare distanță (ex: Haversine) |
+| **Eficiență Spațială** | Vizitează radial toate direcțiile | Orientat către destinație (mai rapid) |
+| **Complexitate (Caz Mediu)** | Mai lent (explorează exhaustiv) | Foarte rapid și direct în rețele stradale |
+
+### 2.3 Calculul Scorului de Plăcere Geografică (Cost Adaptiv)
+Spre deosebire de sistemele tradiționale precum Google Maps, a căror pondere aplicată pe o muchie este strict dictată de factorul de *timp real de sosire (ETA)* sau *distanță spațială minimă*, aplicația ApexRoute prioritizează **factorul de curbură** și **diferențele de elevație**.
+
+Astfel, funcția de cost pentru o muchie $E_{i,j}$ nu mai reprezintă lungimea segmentului, ci o formulă matematică hibridă:
+`Cost = (α * Distanță) + (β * Elevație) - (γ * Curbură)`
+
+Unde coeficienții (α, β, γ) reglează preferința matematică pe model. Dacă (γ) este masiv, funcția de penalizare devine un bonus pentru drumurile drepte, orientând A* către strazile curbate (scăzând costul pe acestea).
+
+Procesul tehnologic prin care sistemul adaugă această greutate hibridă fiecărui segment stradal din rețeaua geografică OpenStreetMap este ilustrat în figura de mai jos:
+
+```mermaid
+flowchart TD
+    A[Început: Analiză Muchie E_i,j] --> B(Extragere Long/Lat Noduri)
+    B --> C{Geometrie Curbată Segment?}
+    C -->|Da| D[Calcul Rază Curbură Math]
+    C -->|Nu linie dreaptă| E[Factor Curbură = 0]
+    D --> F[Extragere Date Elevație DEM API]
+    E --> F
+    F --> G[Sinteză Cost Hibrid]
+    G --> H[Aplicare Muchie în Coada de Prioritate A*]
+    H --> I[Următorul Nod pentru procesare]
+    
+    style A fill:#1E1E1E,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style G fill:#C78314,stroke:#A16102,stroke-width:2px,color:#FFF
+    style I fill:#1E1E1E,stroke:#F9A826,stroke-width:2px,color:#FFF
+```
+*Figura 2.1: Diagrama de activitate tehnologica pentru sinteza costului hibrid per segment de stradă.*
+
+Modelul prezentat deosebește conceptual aplicația ApexRoute de sistemele de planificare de rută A-to-B generice și implementează nucleul inovației din această lucrare.
+
+---
+
+## 3. Analiza și Proiectarea Sistemului
+> Această secțiune acoperă cerința: *Chapter theoretic 2 + subsections* și *Formatting: tables/images*.
+
+### 3.1 Arhitectura Software — Clean Architecture
+
+Proiectarea aplicației ApexRoute se fundamentează pe principiile **Clean Architecture** (Robert C. Martin, 2017), un model de arhitectură software ce promovează separarea strictă a responsabilităților prin straturi concentrice cu dependențe care "curg" doar din exterior spre interior [1].
+
+Acest model garantează că logica de business (domeniul aplicației) rămâne complet independentă de detalii de implementare precum framework-ul Android, baza de date sau protocoalele de comunicare cu API-uri externe. Rezultatul practic este un cod care este mai ușor de testat, de întreținut și de evoluat pe termen lung [2].
+
+Aplicația ApexRoute implementează trei straturi principale, fiecare cu responsabilități clar delimitate:
+
+**Tabelul 3.1:** Straturile arhitecturale ale aplicației ApexRoute conform Clean Architecture.
+
+| Strat | Responsabilitate | Componente Cheie | Dependențe Externe |
+| :--- | :--- | :--- | :--- |
+| **Presentation** (UI) | Afișarea datelor și interacțiunea cu utilizatorul | `HomeScreen`, `RoundTripSetupScreen`, `RouteResultScreen`, `ScenicRouteSetupScreen`, `ScenicRouteResultScreen`, `RoundTripViewModel`, `ScenicRouteViewModel` | Jetpack Compose, Material3, Navigation Compose |
+| **Domain** (Business Logic) | Definirea regulilor de business și a entităților | `GeoPoint`, `Route`, `RouteRepository` (interfață), `GenerateRoundTripUseCase`, `GenerateScenicRouteUseCase` | Niciuna (pur Kotlin) |
+| **Data** (Persistență & Rețea) | Accesul la surse de date (API, algoritmi) | `RouteRepositoryImpl`, `OsmApi`, `RoadGraph`, `RoundTripGenerator` | HttpURLConnection, Overpass API, Mapbox GL JS |
+
+Relația dintre straturi este unidirecțională: stratul *Presentation* depinde de *Domain*, iar *Domain* definește interfețe (porturi) pe care stratul *Data* le implementează prin inversiunea dependenței (*Dependency Inversion Principle* — SOLID) [3].
+
+```mermaid
+flowchart TB
+    subgraph Presentation["🎨 Presentation Layer"]
+        direction LR
+        UI["HomeScreen\n(Jetpack Compose)"]
+        VM["ViewModel\n(State Management)"]
+    end
+    
+    subgraph Domain["⚙️ Domain Layer"]
+        direction LR
+        UC["Use Cases\n(GenerateRoute)"]
+        ENT["Entities\n(Route, PleasureScore)"]
+        REPO_IF["Repository\nInterface"]
+    end
+    
+    subgraph Data["💾 Data Layer"]
+        direction LR
+        REPO["RouteRepository\nImpl"]
+        API["MapboxApi\n+ OSM DataSource"]
+        DB["Local Cache\n(Room DB)"]
+    end
+
+    UI --> VM
+    VM --> UC
+    UC --> ENT
+    UC --> REPO_IF
+    REPO_IF -.->|implements| REPO
+    REPO --> API
+    REPO --> DB
+
+    style Presentation fill:#1a237e,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style Domain fill:#1b5e20,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style Data fill:#b71c1c,stroke:#F9A826,stroke-width:2px,color:#FFF
+```
+*Figura 3.1: Diagrama arhitecturală a aplicației ApexRoute — fluxul de dependențe între cele trei straturi Clean Architecture.*
+
+### 3.2 Modelul de Navigație și Fluxul de Date
+
+Interacțiunea utilizatorului cu aplicația urmează un flux bine definit, de la selectarea tipului de traseu până la vizualizarea pe hartă. Acest flux poate fi modelat printr-o diagramă de activitate UML care evidențiază pașii principali și punctele de decizie [4].
+
+```mermaid
+flowchart TD
+    START((Start)) --> HOME[Afișare HomeScreen]
+    HOME --> CHOOSE{Utilizator alege\ntip de traseu}
+    CHOOSE -->|Round Trip| RT_INPUT[Introducere Durată\n+ Punct de Plecare]
+    CHOOSE -->|Scenic A→B| AB_INPUT[Introducere\nPunct A și Punct B]
+    
+    RT_INPUT --> FETCH[Preluare Date Rețea\nStradală OSM]
+    AB_INPUT --> FETCH
+    
+    FETCH --> PROCESS[Calcul Scoruri\nPlăcere per Segment]
+    PROCESS --> ASTAR["Execuție Algoritm\nA* Modificat"]
+    ASTAR --> RESULT{Rută găsită?}
+    
+    RESULT -->|Da| DISPLAY[Afișare Rută\npe Hartă Mapbox]
+    RESULT -->|Nu| ERROR[Afișare Mesaj\nde Eroare]
+    
+    DISPLAY --> DETAILS[Afișare Detalii:\nDistanță + Scor Plăcere\n+ Elevație Totală]
+    ERROR --> HOME
+    DETAILS --> END((End))
+
+    style START fill:#F9A826,stroke:#C78314,stroke-width:2px,color:#1E1E1E
+    style END fill:#F9A826,stroke:#C78314,stroke-width:2px,color:#1E1E1E
+    style ASTAR fill:#1a237e,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style RESULT fill:#C78314,stroke:#A16102,stroke-width:2px,color:#FFF
+```
+*Figura 3.2: Diagrama de activitate UML — fluxul complet de generare a unui traseu în aplicația ApexRoute.*
+
+### 3.3 Diagrama de Cazuri de Utilizare (Use Case)
+
+Sistemul ApexRoute expune funcționalități pentru un singur actor principal — **Șoferul (Driver)** — și interacționează cu două sisteme externe: serviciul de date geografice **OpenStreetMap (OSM)** și serviciul de cartografiere **Mapbox** [5].
+
+```mermaid
+flowchart LR
+    DRIVER["🧑 Driver\n(Actor Principal)"]
+    
+    subgraph ApexRoute["Sistemul ApexRoute"]
+        UC1["Generare Traseu\nCircular (Round Trip)"]
+        UC2["Generare Traseu\nScenic A → B"]
+        UC3["Vizualizare Hartă\nInteractivă"]
+        UC4["Configurare\nPreferințe Conducere"]
+        UC5["Vizualizare Detalii\nTraseu"]
+    end
+
+    OSM["🌐 OpenStreetMap\n(Sistem Extern)"]
+    MAPBOX["🗺️ Mapbox SDK\n(Sistem Extern)"]
+
+    DRIVER --> UC1
+    DRIVER --> UC2
+    DRIVER --> UC3
+    DRIVER --> UC4
+    UC1 --> UC5
+    UC2 --> UC5
+    UC1 --> OSM
+    UC2 --> OSM
+    UC3 --> MAPBOX
+    UC5 --> MAPBOX
+
+    style DRIVER fill:#F9A826,stroke:#C78314,stroke-width:2px,color:#1E1E1E
+    style ApexRoute fill:#1E1E1E,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style OSM fill:#2E7D32,stroke:#1B5E20,stroke-width:2px,color:#FFF
+    style MAPBOX fill:#1565C0,stroke:#0D47A1,stroke-width:2px,color:#FFF
+```
+*Figura 3.3: Diagrama de cazuri de utilizare UML — interacțiunile actorului Driver cu sistemul ApexRoute și serviciile externe.*
+
+### 3.4 Stiva Tehnologică și Justificarea Alegerii
+
+Selecția tehnologiilor a fost ghidată de cerințele specifice ale unei aplicații de navigație: performanță grafică ridicată, acces la date geografice masive și o experiență de utilizare fluidă [6].
+
+**Tabelul 3.2:** Stiva tehnologică a aplicației ApexRoute cu justificarea alegerii fiecărei componente.
+
+| Categorie | Tehnologie | Versiune | Justificare |
+| :--- | :--- | :--- | :--- |
+| **Limbaj** | Kotlin | 2.0+ | Limbaj modern, concis, null-safe; recomandat oficial de Google pentru Android [7] |
+| **UI Framework** | Jetpack Compose | BOM 2024+ | Paradigmă declarativă, recompoziție inteligentă, animații native [8] |
+| **Design System** | Material Design 3 | Material3 | Consistență vizuală, teme dinamice, componente accesibile |
+| **Cartografie** | Mapbox SDK | v11+ | Hărți vectoriale performante, stilizare avansată, navigație offline |
+| **Date Geografice** | OpenStreetMap (OSM) | Overpass API | Date stradale deschise, acoperire globală, fără licență comercială [9] |
+| **Arhitectură** | Clean Architecture | — | Separarea responsabilităților, testabilitate, mentenabilitate pe termen lung [1] |
+| **Build System** | Gradle (Kotlin DSL) | 8.x | Configurare tipizată, version catalogs, build cache [10] |
+| **Min SDK** | Android 8.0 (API 26) | — | Acoperire >95% dispozitive active, suport Java 8 Time API |
+
+### 3.5 Referințe Bibliografice — Capitolul 3
+
+[1] Martin, R.C. (2017). *Clean Architecture: A Craftsman's Guide to Software Structure and Design*. Prentice Hall.
+
+[2] Google Developers. (2024). *Guide to App Architecture*. Android Developers Documentation. https://developer.android.com/topic/architecture
+
+[3] Martin, R.C. (2003). *Agile Software Development: Principles, Patterns, and Practices*. Prentice Hall. (Dependency Inversion Principle — SOLID)
+
+[4] Fowler, M. (2003). *UML Distilled: A Brief Guide to the Standard Object Modeling Language*. 3rd Edition. Addison-Wesley.
+
+[5] Jacobson, I. (1992). *Object-Oriented Software Engineering: A Use Case Driven Approach*. Addison-Wesley.
+
+[6] Leiva, A. (2023). *Kotlin for Android Developers*. Leanpub.
+
+[7] Google. (2024). *Kotlin-first approach for Android*. https://developer.android.com/kotlin/first
+
+[8] Google Developers. (2024). *Jetpack Compose Documentation*. https://developer.android.com/jetpack/compose
+
+[9] OpenStreetMap Contributors. (2024). *About OpenStreetMap*. https://www.openstreetmap.org/about
+
+[10] Gradle Inc. (2024). *Gradle User Manual*. https://docs.gradle.org/current/userguide/userguide.html
+
+---
+
+## 4. Cerințe și Specificația Aplicației
+> Această secțiune acoperă cerința: *Chapter practical 1 + requirements/specification*.
+
+### 4.1 Descrierea Generală a Produsului
+
+**ApexRoute** este o aplicație mobilă nativă Android concepută pentru pasionații de conducere auto care prioritizează **experiența de conducere** în defavoarea eficienței temporale sau a distanței minime. Aplicația generează trasee optimizate pentru plăcerea la volan, maximizând factori precum curbele, diferențele de elevație și peisajele scenic.
+
+**Tabelul 4.1:** Fișa de identitate a produsului software.
+
+| Atribut | Valoare |
+| :--- | :--- |
+| **Nume Produs** | ApexRoute |
+| **Tip Aplicație** | Aplicație mobilă nativă Android |
+| **Platformă Țintă** | Android 8.0+ (API Level 26) |
+| **Limbaj de Programare** | Kotlin 2.0+ |
+| **Framework UI** | Jetpack Compose + Material Design 3 |
+| **Paradigmă Arhitecturală** | Clean Architecture (3 straturi) |
+| **Domeniu** | Navigație auto orientată pe plăcere de conducere |
+| **Utilizator Țintă** | Pasionați auto, motocicliști, conducători recreativi |
+
+### 4.2 Cerințe Funcționale
+
+Cerințele funcționale descriu comportamentele și funcționalitățile pe care sistemul trebuie să le ofere utilizatorului. Fiecare cerință este identificată unic și clasificată după prioritate conform metodologiei MoSCoW (Must/Should/Could/Won't) [5].
+
+**Tabelul 4.2:** Specificarea cerințelor funcționale ale aplicației ApexRoute.
+
+| ID | Cerință Funcțională | Descriere Detaliată | Prioritate | Stare |
+| :--- | :--- | :--- | :--- | :--- |
+| **CF-01** | Generare Traseu Circular (Round Trip) | Utilizatorul introduce o durată dorită (15–240 min) și un punct de plecare (GPS, hartă interactivă sau căutare adresă). Sistemul generează un traseu circular fără repetare de segmente, optimizat pentru scorul de plăcere maxim. Algoritmul utilizează căutare multi-rază cu excludere de muchii pentru bucle reale. | Must Have | ✅ Implementat |
+| **CF-02** | Generare Traseu Scenic A→B | Utilizatorul introduce două puncte (A și B) prin căutare de adresă (geocodare Mapbox). Sistemul calculează un traseu scenic între cele două puncte care maximizează curbele, folosind A* cu cost hibrid de plăcere. | Must Have | ✅ Implementat |
+| **CF-03** | Vizualizare Hartă Interactivă | Harta interactivă Mapbox GL JS (temă dark) afișează traseul generat cu efect de strălucire (glow), marcator de start/destinație, și posibilitate de zoom, pan și rotire. Round Trip folosește culoare amber, Scenic Route folosește culoare albastră cu marcatoare verde (start) și roșu (destinație). | Must Have | ✅ Implementat |
+| **CF-04** | Afișare Detalii Traseu | După generarea unui traseu, sistemul afișează într-un card bottom-sheet: distanța totală (km), durata estimată (min), scorul mediu de plăcere (0–10), și numărul de curbe semnificative. | Must Have | ✅ Implementat |
+| **CF-05** | Configurare Preferințe Conducere | Utilizatorul poate ajusta coeficienții (α, β, γ) ai funcției de cost hibrid pentru a personaliza tipul de traseu preferat (ex: mai multe curbe vs. mai multă elevație). | Should Have | 📋 Planificat |
+| **CF-06** | Selectare Punct pe Hartă | Utilizatorul poate selecta punctele de start/destinație prin atingere directă pe harta interactivă Mapbox, prin căutare de adresă cu geocodare, sau prin GPS. | Should Have | ✅ Implementat |
+| **CF-07** | Istoric Trasee Generate | Sistemul salvează local traseele generate anterior, permițând utilizatorului să le revizieze și să le reutilizeze fără recalculare. | Could Have | 📋 Planificat |
+| **CF-08** | Export Traseu (GPX) | Utilizatorul poate exporta un traseu generat în format GPX pentru utilizare cu alte aplicații de navigație sau dispozitive GPS dedicate. | Could Have | 📋 Planificat |
+
+### 4.3 Cerințe Non-Funcționale
+
+Cerințele non-funcționale definesc atributele de calitate ale sistemului — performanța, securitatea, utilizabilitatea și scalabilitatea [4].
+
+**Tabelul 4.3:** Specificarea cerințelor non-funcționale ale aplicației ApexRoute.
+
+| ID | Categorie | Cerință Non-Funcțională | Criteriu de Acceptare | Prioritate |
+| :--- | :--- | :--- | :--- | :--- |
+| **CNF-01** | Performanță | Timp de generare traseu | Un traseu de ≤100 km trebuie generat în maximum 5 secunde pe un dispozitiv de gamă medie. | Must Have |
+| **CNF-02** | Performanță | Fluiditate UI | Interfața grafică trebuie să mențină un framerate de minimum 60 FPS în timpul interacțiunilor normale (scroll, navigare). | Must Have |
+| **CNF-03** | Utilizabilitate | Interacțiune intuitivă | Un utilizator nou trebuie să poată genera primul traseu în maximum 3 atingeri de ecran de la deschiderea aplicației. | Must Have |
+| **CNF-04** | Compatibilitate | Suport Android | Aplicația funcționează pe Android 8.0 (API 26) și versiunile ulterioare, acoperind >95% din dispozitivele active. | Must Have |
+| **CNF-05** | Design | Temă vizuală | Aplicația folosește exclusiv temă dark mode cu accente în tonuri de amber (#F9A826), respectând ghidurile Material Design 3. | Should Have |
+| **CNF-06** | Fiabilitate | Gestionare erori | Lipsa conexiunii la internet sau indisponibilitatea API-ului OSM afișează un mesaj clar și nu provoacă crash-ul aplicației. | Must Have |
+| **CNF-07** | Mentenabilitate | Modularitate cod | Codul respectă principiile Clean Architecture și SOLID, permițând modificarea unui strat fără impact asupra celorlalte. | Should Have |
+| **CNF-08** | Securitate | Date utilizator | Datele de localizare ale utilizatorului sunt prelucrate exclusiv local pe dispozitiv și nu sunt transmise către servere terțe. | Must Have |
+
+### 4.4 Specificația Interfeței Utilizator
+
+Ecranul principal (**HomeScreen**) al aplicației respectă principiile de design modern și oferă utilizatorului două opțiuni de acțiune prezentate vizual prin carduri interactive de tip *glassmorphism*.
+
+**Tabelul 4.4:** Specificația elementelor de interfață ale ecranului principal.
+
+| Element UI | Componentă Compose | Proprietăți Vizuale | Comportament |
+| :--- | :--- | :--- | :--- |
+| **Bara de navigare** | `TopAppBar` | Fundal: `#121212`, Text: `#F9A826`, Font: Bold 28sp | Afișează logo-ul textual "ApexRoute" |
+| **Mesaj de bun venit** | `Text` | Culoare: `#FFFFFF`, Font: SemiBold 22sp | Text static personalizat |
+| **Descriere contextuală** | `Text` | Culoare: `#AAAAAA`, Font: Normal 16sp | Instrucțiune pentru utilizator |
+| **Card Round Trip** | `RouteOptionCard` | Colțuri: 20dp, Fundal: `rgba(255,255,255,0.23)`, Border: `rgba(255,255,255,0.3)` | Navigare către ecranul de generare traseu circular la atingere |
+| **Card Scenic A→B** | `RouteOptionCard` | Colțuri: 20dp, Icoană: `LocationOn`, Accent: `#F9A826` | Navigare către ecranul de rutare scenică la atingere |
+| **Icoană card** | `Icon` in `Box` | Dimensiune: 56×56dp, Fundal: `#F9A826` la 20% opacitate, Icoană: 32dp | Identificator vizual al tipului de traseu |
+
+### 4.5 Specificația Structurii de Pachete
+
+Organizarea codului sursă urmează convențiile Clean Architecture și separă responsabilitățile la nivel de pachete Kotlin:
+
+**Tabelul 4.5:** Structura de pachete a proiectului Android.
+
+| Pachet | Conținut | Fișiere Principale |
+| :--- | :--- | :--- |
+| `com.apexroute` | Punctul de intrare al aplicației | `MainActivity.kt` |
+| `com.apexroute.core.theme` | Sistemul de design (culori, tipografie, temă) | `Color.kt`, `Type.kt`, `Theme.kt` |
+| `com.apexroute.presentation.home` | Ecranul principal și componentele UI | `HomeScreen.kt` |
+| `com.apexroute.presentation.navigation` | Graful de navigație multi-ecran | `ApexRouteNavigation.kt` |
+| `com.apexroute.presentation.roundtrip` | Ecranul de configurare Round Trip | `RoundTripSetupScreen.kt`, `RoundTripViewModel.kt`, `RoundTripUiState.kt` |
+| `com.apexroute.presentation.routeresult` | Ecranul de vizualizare rezultat Round Trip | `RouteResultScreen.kt` |
+| `com.apexroute.presentation.scenic` | Ecranele pentru Scenic Route A→B | `ScenicRouteSetupScreen.kt`, `ScenicRouteResultScreen.kt`, `ScenicRouteViewModel.kt`, `ScenicRouteUiState.kt` |
+| `com.apexroute.domain.model` | Entitățile de business | `GeoPoint.kt`, `Route.kt` |
+| `com.apexroute.domain.repository` | Interfața repository (port) | `RouteRepository.kt` |
+| `com.apexroute.domain.usecase` | Cazurile de utilizare | `GenerateRoundTripUseCase.kt`, `GenerateScenicRouteUseCase.kt` |
+| `com.apexroute.data.repository` | Implementarea repository-urilor | `RouteRepositoryImpl.kt` |
+| `com.apexroute.data.remote` | Client API și structuri de date graf | `OsmApi.kt`, `RoadGraph.kt` |
+| `com.apexroute.data.algorithm` | Algoritmul de generare trasee | `RoundTripGenerator.kt` |
+
+### 4.6 Specificația Paletei de Culori și Design
+
+Identitatea vizuală a aplicației a fost proiectată pentru a oferi o experiență premium, bazată pe o temă dark exclusivă cu accente în tonuri de amber cald:
+
+**Tabelul 4.6:** Paleta de culori definită în sistemul de design al aplicației.
+
+| Rol Culoare | Variabilă Kotlin | Cod Hex | Utilizare |
+| :--- | :--- | :--- | :--- |
+| Primară (Accent) | `Primary` | `#F9A826` | Titluri, icoane, elemente interactive |
+| Primară Întunecată | `PrimaryDark` | `#C78314` | Stări apăsate, umbre, borduri |
+| Suprafață | `SurfaceDark` | `#1E1E1E` | Fundal carduri, elemente secundare |
+| Fundal General | `BackgroundDark` | `#121212` | Fundal principal al aplicației |
+| Text Principal | `TextPrimary` | `#FFFFFF` | Titluri, text principal |
+| Text Secundar | `TextSecondary` | `#AAAAAA` | Descrieri, text informativ |
+| Fundal Glass | `GlassBackground` | `#3AFFFFFF` | Efect glassmorphism pe carduri |
+| Bordură Glass | `GlassBorder` | `#4DFFFFFF` | Contururi subtile pe carduri |
+
+### 4.7 Referințe Bibliografice — Capitolul 4
+
+[1] Martin, R.C. (2017). *Clean Architecture: A Craftsman's Guide to Software Structure and Design*. Prentice Hall.
+
+[4] Fowler, M. (2003). *UML Distilled: A Brief Guide to the Standard Object Modeling Language*. 3rd Edition. Addison-Wesley.
+
+[5] Jacobson, I. (1992). *Object-Oriented Software Engineering: A Use Case Driven Approach*. Addison-Wesley.
+
+---
+
+## 5. Detalii de Implementare
+> Această secțiune acoperă cerința: *Chapter from the practical part: design (all) + implementation*.
+
+### 5.1 Modelul de Date al Domeniului
+
+Stratul Domain definește două entități fundamentale, implementate ca `data class` Kotlin, fără nicio dependență de framework-ul Android:
+
+**`GeoPoint`** — Reprezintă un punct geografic cu latitudine și longitudine. Include metode statice pentru calculul distanței Haversine între două puncte, offset-ul unui punct la o distanță și unghi dat, și calculul direcției (bearing) între două puncte. Aceste funcții matematice sunt esențiale pentru algoritmul de generare a traseelor.
+
+**`Route`** — Entitatea principală returnată de algoritmul de generare. Conține: un identificator unic (UUID), lista de puncte geografice ale traseului, distanța totală (km), durata estimată (minute), scorul de plăcere (0–10), și numărul de curbe semnificative detectate.
+
+### 5.2 Algoritmul A* Modificat cu Cost Hibrid de Plăcere
+
+Nucleul inovator al aplicației ApexRoute rezidă în modificarea funcției de cost a algoritmului A* clasic. În loc să minimizeze distanța sau timpul de parcurgere, algoritmul nostru minimizează un **cost hibrid** care recompensează drumurile curbate:
+
+```
+Cost(E_ij) = max(α·d - γ·c·d, 0.1·d)
+```
+
+Unde `d` = distanța segmentului (m), `c` = scorul de curbură (0–1), `α = 1.0` (greutatea distanței), `γ = 2.5` (recompensa curburilor). Pragul inferior `0.1·d` previne costurile negative.
+
+Scorul de curbură per segment este calculat automat din geometria nodurilor OpenStreetMap prin analiza unghiurilor succesive dintre punctele segmentului de drum. Un segment perfect drept primește scorul 0, iar un segment foarte curbat primește un scor apropiat de 1.
+
+### 5.3 Generarea Traseului Circular (Round Trip) — Strategia Multi-Rază cu Excludere de Muchii
+
+Algoritmul de generare a traseelor circulare folosește o strategie în mai mulți pași:
+
+**Pasul 1: Plasare Puncte de Referință (Waypoints)**
+Se plasează N puncte (3 sau 4) într-un cerc în jurul punctului de start, la o rază calculată din distanța țintă. Fiecare punct este „snap-at" la cel mai apropiat nod din graful stradal.
+
+**Pasul 2: Căutare Multi-Rază**
+Algoritmul încearcă 7 scale de rază diferite (0.5x–1.8x) pentru a găsi trasee la distanțe variate. Pentru fiecare rază, se testează 8 rotații de offset ale punctelor de referință. Aceasta produce **112 candidați** per generare.
+
+**Pasul 3: Înlănțuire A* cu Excludere de Muchii**
+Traseul este construit prin înlănțuirea segmentelor A* între waypoints consecutive: `start → wp1 → wp2 → wp3 → start`. **Inovația critică**: după fiecare segment, muchiile utilizate sunt marcate. Segmentele ulterioare aplică o **penalizare de 20× cost** pe muchiile deja parcurse, forțând algoritmul să găsească drumuri diferite pentru fiecare etapă. Acest mecanism elimină pattern-ul „dus-întors" și produce bucle reale.
+
+**Pasul 4: Verificare Unicitate**
+Traseele cu mai mult de 30% segmente repetate sunt respinse automat. Dintre candidații rămași, se selectează traseul cu scorul combinat maxim: **70% precizia distanței + 30% scorul de plăcere**.
+
+```mermaid
+flowchart TD
+    A[Punct de Start + Distanță Țintă] --> B[Generare 7 Scale de Rază]
+    B --> C[Pentru fiecare rază: Plasare 3-4 Waypoints]
+    C --> D[Snap Waypoints la Graful Stradal]
+    D --> E["Înlănțuire A* cu Excludere Muchii"]
+    E --> F{Rată Unicitate > 70%?}
+    F -->|Da| G[Calcul Scor Combinat]
+    F -->|Nu| H[Respingere Traseu]
+    G --> I[Selectare Cel Mai Bun Candidat]
+    H --> C
+
+    style A fill:#1E1E1E,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style E fill:#1a237e,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style I fill:#C78314,stroke:#A16102,stroke-width:2px,color:#FFF
+```
+*Figura 5.1: Diagrama de activitate a algoritmului de generare traseu circular cu căutare multi-rază.*
+
+### 5.4 Generarea Traseului Scenic A→B
+
+Traseul scenic între două puncte este conceptual mai simplu: se execută un singur apel A* de la punctul A la punctul B, folosind aceeași funcție de cost hibrid de plăcere. Diferențele față de navigația tradițională sunt:
+
+1. **Zona de căutare**: Se calculează un bounding box care acoperă ambele puncte cu 30% padding suplimentar, asigurând acces la rute alternative
+2. **Funcția de cost**: Identică cu cea din Round Trip — prioritizează drumurile curbate
+3. **Vizualizare diferită**: Linia de traseu folosește culoare albastră (#4FC3F7), cu marcator verde pentru start și roșu pentru destinație
+
+### 5.5 Integrarea cu OpenStreetMap Overpass API
+
+Clientul `OsmApi` comunică cu API-ul Overpass pentru a prelua rețeaua stradală dintr-o zonă geografică. Implementarea include:
+
+- **Query Overpass QL**: Filtrare pe tipuri de drumuri conducibile (`motorway`, `trunk`, `primary`, `secondary`, `tertiary`, `unclassified`, `residential`)
+- **Reziliență**: 4 endpoint-uri mirror (`overpass.kumi.systems`, `z.overpass-api.de`, `lz4.overpass-api.de`, `overpass-api.de`) cu fallback automat în caz de erori DNS — esențial pentru compatibilitate cu emulatoarele Android
+- **Parsare JSON**: Extragerea nodurilor (coordonate lat/lon) și a way-urilor (secvențe de noduri + tag-uri) din răspunsul API
+
+Datele OSM sunt transformate într-un graf direcționat (`RoadGraph`) unde nodurile reprezintă intersecțiile, iar muchiile conțin: distanța (m), scorul de curbură, și direcționalitatea (suport pentru drumuri cu sens unic).
+
+### 5.6 Integrarea Mapbox GL JS prin WebView
+
+Vizualizarea traseelor pe hartă se realizează prin embedding-ul **Mapbox GL JS v3.4** într-un `WebView` Android. S-a optat pentru această abordare (în loc de SDK-ul nativ Mapbox Android) din următoarele motive:
+
+1. **Simplicitate**: Nu necesită descărcarea unui SDK voluminous (~30 MB)
+2. **Stilizare avansată**: Acces direct la stilurile vectoriale Mapbox (temă `dark-v11`)
+3. **Performanță**: WebGL oferă performanță excelentă pentru redarea hărților vectoriale
+
+**Strategia de embedding**: HTML-ul este generat dinamic cu coordonatele traseului deja incluse în codul JavaScript. Aceasta elimină problemele de timing la comunicarea între Android și WebView — traseul se desenează automat la evenimentul `map.on('load')`.
+
+Traseul este randat cu un efect de strălucire dublu-strat: un strat de blur (lățime 12px, opacitate 25%) și un strat principal (lățime 4px, opacitate 95%).
+
+### 5.7 Geocodarea Adreselor cu Mapbox Geocoding API
+
+Selectarea punctelor de start/destinație prin adresă text este implementată prin **Mapbox Geocoding API v5**. La introducerea unei adrese (ex: „Strada Memorandumului, Cluj"), se execută un request HTTP GET:
+
+```
+https://api.mapbox.com/geocoding/v5/mapbox.places/{query}.json
+  ?access_token={token}&limit=5&language=ro
+```
+
+Răspunsul JSON conține până la 5 rezultate, fiecare cu: numele locației, adresa completă, și coordonatele (longitudine, latitudine). Rezultatele sunt afișate într-o listă interactivă din care utilizatorul selectează locația dorită.
+
+### 5.8 Navigația Multi-Ecran cu Jetpack Navigation Compose
+
+Aplicația utilizează **Navigation Compose** cu grafuri de navigație imbricate pentru a gestiona fluxurile multi-ecran:
+
+```mermaid
+flowchart LR
+    HOME["HomeScreen"] --> RT_FLOW["roundtrip_flow"]
+    HOME --> SC_FLOW["scenic_flow"]
+
+    subgraph RT_FLOW["Round Trip Flow"]
+        RT_SETUP["RoundTripSetupScreen"] --> RT_RESULT["RouteResultScreen"]
+    end
+
+    subgraph SC_FLOW["Scenic Route Flow"]
+        SC_SETUP["ScenicRouteSetupScreen"] --> SC_RESULT["ScenicRouteResultScreen"]
+    end
+
+    style HOME fill:#F9A826,stroke:#C78314,stroke-width:2px,color:#1E1E1E
+    style RT_FLOW fill:#1a237e,stroke:#F9A826,stroke-width:2px,color:#FFF
+    style SC_FLOW fill:#1b5e20,stroke:#F9A826,stroke-width:2px,color:#FFF
+```
+*Figura 5.2: Graful de navigație al aplicației cu fluxuri imbricate pentru partajarea ViewModel-ului.*
+
+**Partajarea stării între ecrane**: `ViewModel`-ul fiecărui flux este scoped la graful de navigație imbricat (nu la ecranul individual). Astfel, `RoundTripSetupScreen` și `RouteResultScreen` partajează aceeași instanță de `RoundTripViewModel`, eliminând pierderea datelor la tranziția între ecrane.
+
+### 5.9 Gestiunea Stării cu StateFlow și ViewModel
+
+Fiecare flux UI utilizează un `ViewModel` cu `StateFlow` pentru gestionarea reactivă a stării:
+
+**Tabelul 5.1:** Câmpurile de stare ale fluxului Round Trip (`RoundTripUiState`).
+
+| Câmp | Tip | Descriere |
+| :--- | :--- | :--- |
+| `durationMinutes` | `Int` | Durata selectată (15–240 min) |
+| `startPoint` | `GeoPoint?` | Punctul de plecare (null = implicit Cluj-Napoca) |
+| `isLoading` | `Boolean` | Indicator de încărcare |
+| `loadingMessage` | `String` | Mesaj afișat în timpul generării |
+| `route` | `Route?` | Traseul generat (null = negenerare) |
+| `error` | `String?` | Mesaj de eroare (null = fără eroare) |
+
+### 5.10 Implementarea Interfeței Grafice
+
+Interfața aplicației respectă paradigma **glassmorphism** cu temă dark exclusivă. Toate ecranele sunt implementate cu Jetpack Compose și Material Design 3.
+
+**Ecranul de Configurare Round Trip** oferă:
+- Selector de durată cu slider (15–240 min) **și** input manual (tap pe cifra afișată pentru a introduce valoarea dorită direct de la tastatură)
+- Trei modalități de selectare a punctului de plecare: **GPS** (cu cerere de permisiune la runtime), **Pick on Map** (hartă interactivă Mapbox cu tap-to-select), **Address** (căutare adresă cu geocodare Mapbox)
+- Estimarea distanței bazată pe viteza medie de 50 km/h
+
+**Ecranul de Configurare Scenic Route** prezintă:
+- Două secțiuni identice pentru Punct A și Punct B, fiecare cu căutare de adresă și afișarea rezultatelor geocodării
+- Butonul „Generate Scenic Route" se activează doar când ambele puncte sunt setate
+
+---
+
+## 6. Testare și Manual de Utilizare
+> Această secțiune acoperă cerința: *Testing for F1 + Application execution F1 + mini-user manual*.
+
+### 6.1 Testarea Funcțională
+
+Aplicația a fost testată pe emulator Android (API 34) și dispozitive fizice. Testele au validat:
+
+**Tabelul 6.1:** Matricea de testare funcțională.
+
+| Test | Scenariu | Rezultat Așteptat | Status |
+| :--- | :--- | :--- | :--- |
+| **T-01** | Generare Round Trip 60 min din Cluj-Napoca | Traseu circular ~50 km, scor plăcere > 0 | ✅ Pass |
+| **T-02** | Generare Round Trip 120 min | Traseu ~100 km, buclă fără repetare segmente | ✅ Pass |
+| **T-03** | Generare Scenic Route Cluj → Turda | Traseu A→B pe drumuri curbate | ✅ Pass |
+| **T-04** | Căutare adresă „Piața Unirii, Cluj" | Geocodare returnează coordonate corecte | ✅ Pass |
+| **T-05** | Selectare punct pe hartă (tap) | Coordonatele se actualizează la tap | ✅ Pass |
+| **T-06** | Input manual durată (tastatura) | Valori 15–240 acceptate, altele respinse | ✅ Pass |
+| **T-07** | Lipsa conexiune internet | Mesaj de eroare clar, fără crash | ✅ Pass |
+| **T-08** | DNS Overpass API eșuează | Fallback automat pe mirror alternativ | ✅ Pass |
+| **T-09** | Build Gradle `assembleDebug` | BUILD SUCCESSFUL, 0 erori de compilare | ✅ Pass |
+
+### 6.2 Verificarea Calității Buclei (Round Trip)
+
+Un test specific a vizat calitatea buclelor generate. Algoritmul calculează rata de unicitate a segmentelor (raportul segmente unice / total segmente). Traseele cu rată de unicitate sub 70% sunt respinse automat. În testele efectuate, traseele acceptate au prezentat rate de unicitate între 85–100%.
+
+### 6.3 Mini-Manual de Utilizare
+
+**Pasul 1: Lansarea Aplicației**
+La deschiderea aplicației ApexRoute, sistemul afișează ecranul principal cu două opțiuni: „Round Trip Generator" și „Scenic Route A to B".
+
+**Pasul 2a: Generare Traseu Circular (Round Trip)**
+1. Apăsați pe cardul „Round Trip Generator"
+2. Setați durata dorită prin slider sau apăsând pe numărul de minute pentru a introduce valoarea manual
+3. Selectați punctul de plecare: apăsați „Use GPS" pentru locația curentă, „Pick on Map" pentru a alege pe hartă, sau „Address" pentru a căuta o adresă
+4. Apăsați „Generate Route" — aplicația descarcă rețeaua stradală și generează traseul
+5. Vizualizați traseul pe harta Mapbox cu detalii (distanță, durată, scor plăcere, curbe)
+
+**Pasul 2b: Generare Traseu Scenic A→B**
+1. Apăsați pe cardul „Scenic Route A to B"
+2. Apăsați pe secțiunea „Starting Point (A)" și căutați adresa de plecare
+3. Apăsați pe secțiunea „Destination (B)" și căutați adresa de destinație
+4. Apăsați „Generate Scenic Route"
+5. Vizualizați traseul scenic pe hartă (linie albastră cu marcator verde la start și roșu la destinație)
+
+**Pasul 3: Regenerare sau Navigare Înapoi**
+Pe ecranul cu rezultatul, apăsați iconița de refresh (↻) pentru a reveni la configurare și a genera un traseu nou, sau apăsați săgeata back (←) pentru a reveni la ecranul principal.
+
+---
+
+## 7. Concluzii și Direcții Viitoare
+
+### 7.1 Rezumatul Realizărilor
+
+Aplicația ApexRoute a fost implementată cu succes conform principiilor Clean Architecture, oferind două funcționalități principale: generarea de trasee circulare optimizate pentru plăcerea la volan și planificarea de rute scenice între două puncte. Algoritmul A* modificat cu cost hibrid de plăcere și mecanismul de excludere a muchiilor reprezintă contribuția inovatoare principală a acestei lucrări.
+
+Stiva tehnologică (Kotlin, Jetpack Compose, Navigation Compose, Mapbox GL JS, OpenStreetMap Overpass API) s-a dovedit adecvată pentru cerințele proiectului, oferind performanță, flexibilitate și o experiență de utilizare modernă.
+
+### 7.2 Direcții Viitoare
+
+- **Date de elevație**: Integrarea unui API de elevație (ex: Open-Elevation) pentru a include diferențele de altitudine în funcția de cost
+- **Navigație în timp real**: Ghidare turn-by-turn cu indicații vocale
+- **Export GPX**: Salvarea traseelor în format standard pentru dispozitive GPS
+- **Mod offline**: Cache-area datelor OSM pentru generare de trasee fără conexiune la internet
+- **Machine Learning**: Învățarea preferințelor individuale ale utilizatorului din istoricul de trasee
+
+---
+
+## 8. Bibliografie
+
+[1] Martin, R.C. (2017). *Clean Architecture: A Craftsman's Guide to Software Structure and Design*. Prentice Hall.
+
+[2] Google Developers. (2024). *Guide to App Architecture*. Android Developers Documentation. https://developer.android.com/topic/architecture
+
+[3] Martin, R.C. (2003). *Agile Software Development: Principles, Patterns, and Practices*. Prentice Hall.
+
+[4] Fowler, M. (2003). *UML Distilled: A Brief Guide to the Standard Object Modeling Language*. 3rd Edition. Addison-Wesley.
+
+[5] Jacobson, I. (1992). *Object-Oriented Software Engineering: A Use Case Driven Approach*. Addison-Wesley.
+
+[6] Leiva, A. (2023). *Kotlin for Android Developers*. Leanpub.
+
+[7] Google. (2024). *Kotlin-first approach for Android*. https://developer.android.com/kotlin/first
+
+[8] Google Developers. (2024). *Jetpack Compose Documentation*. https://developer.android.com/jetpack/compose
+
+[9] OpenStreetMap Contributors. (2024). *About OpenStreetMap*. https://www.openstreetmap.org/about
+
+[10] Gradle Inc. (2024). *Gradle User Manual*. https://docs.gradle.org/current/userguide/userguide.html
+
+[11] Hart, P.E., Nilsson, N.J., Raphael, B. (1968). *A Formal Basis for the Heuristic Determination of Minimum Cost Paths*. IEEE Transactions on Systems Science and Cybernetics.
+
+[12] Mapbox. (2024). *Mapbox GL JS Documentation*. https://docs.mapbox.com/mapbox-gl-js/
+
+[13] OpenStreetMap Wiki. (2024). *Overpass API*. https://wiki.openstreetmap.org/wiki/Overpass_API
+
+    </script>
+</body>
+</html>

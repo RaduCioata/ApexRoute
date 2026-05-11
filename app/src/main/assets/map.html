@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #121212; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .mapboxgl-ctrl-attrib { display: none !important; }
+    </style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+    var map;
+
+    function initMap(token, centerLng, centerLat, zoom) {
+        mapboxgl.accessToken = token;
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/dark-v11',
+            center: [centerLng, centerLat],
+            zoom: zoom || 12,
+            attributionControl: false
+        });
+        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    }
+
+    function setRoute(coordsJson) {
+        if (!map) return;
+
+        var coords = JSON.parse(coordsJson);
+
+        var geojson = {
+            type: 'Feature',
+            geometry: {
+                type: 'LineString',
+                coordinates: coords
+            }
+        };
+
+        function addRouteLayer() {
+            // Glow effect layer
+            if (map.getSource('route-glow')) {
+                map.getSource('route-glow').setData(geojson);
+            } else {
+                map.addSource('route-glow', { type: 'geojson', data: geojson });
+                map.addLayer({
+                    id: 'route-glow',
+                    type: 'line',
+                    source: 'route-glow',
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: {
+                        'line-color': '#F9A826',
+                        'line-width': 10,
+                        'line-opacity': 0.25,
+                        'line-blur': 6
+                    }
+                });
+            }
+
+            // Main route layer
+            if (map.getSource('route')) {
+                map.getSource('route').setData(geojson);
+            } else {
+                map.addSource('route', { type: 'geojson', data: geojson });
+                map.addLayer({
+                    id: 'route',
+                    type: 'line',
+                    source: 'route',
+                    layout: { 'line-join': 'round', 'line-cap': 'round' },
+                    paint: {
+                        'line-color': '#F9A826',
+                        'line-width': 4,
+                        'line-opacity': 0.9
+                    }
+                });
+            }
+
+            // Start/end marker
+            if (coords.length > 0) {
+                var startCoord = coords[0];
+
+                if (map.getSource('start-point')) {
+                    map.getSource('start-point').setData({
+                        type: 'Feature',
+                        geometry: { type: 'Point', coordinates: startCoord }
+                    });
+                } else {
+                    map.addSource('start-point', {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            geometry: { type: 'Point', coordinates: startCoord }
+                        }
+                    });
+                    map.addLayer({
+                        id: 'start-point',
+                        type: 'circle',
+                        source: 'start-point',
+                        paint: {
+                            'circle-radius': 8,
+                            'circle-color': '#F9A826',
+                            'circle-stroke-width': 3,
+                            'circle-stroke-color': '#FFFFFF'
+                        }
+                    });
+                }
+            }
+
+            // Fit map to route bounds
+            var bounds = coords.reduce(function(b, coord) {
+                return b.extend(coord);
+            }, new mapboxgl.LngLatBounds(coords[0], coords[0]));
+            map.fitBounds(bounds, { padding: 60, duration: 1000 });
+        }
+
+        if (map.isStyleLoaded()) {
+            addRouteLayer();
+        } else {
+            map.on('load', addRouteLayer);
+        }
+    }
+</script>
+</body>
+</html>

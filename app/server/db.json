@@ -1,0 +1,45 @@
+{
+  "students": [
+    {
+      "id": 12,
+      "name": "Radu",
+      "grade": 10
+    },
+    {
+      "id": 14,
+      "name": "Vasile",
+      "grade": 7.8
+    },
+    {
+      "id": 15,
+      "name": "Monica",
+      "grade": 11
+    },
+    {
+      "id": 16,
+      "name": "Denis",
+      "grade": 5.6
+    },
+    {
+      "id": 17,
+      "name": "Marian",
+      "grade": 8.3
+    },
+    {
+      "id": 18,
+      "name": "Pop",
+      "grade": 7.3
+    },
+    {
+      "id": 19,
+      "name": "Gheorghe",
+      "grade": 9
+    },
+    {
+      "id": 23,
+      "name": "R",
+      "grade": 5
+    }
+  ],
+  "nextId": 24
+}
