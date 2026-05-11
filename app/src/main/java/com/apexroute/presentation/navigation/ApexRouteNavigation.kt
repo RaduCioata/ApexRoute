@@ -7,7 +7,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.apexroute.presentation.home.HomeScreen
+import com.apexroute.presentation.home.HomeViewModel
+import com.apexroute.presentation.recent.RecentRouteResultScreen
 import com.apexroute.presentation.roundtrip.RoundTripSetupScreen
 import com.apexroute.presentation.roundtrip.RoundTripViewModel
 import com.apexroute.presentation.routeresult.RouteResultScreen
@@ -25,10 +29,24 @@ fun ApexRouteNavigation() {
 
     NavHost(navController = navController, startDestination = "home") {
 
-        composable("home") {
+        composable("home") { entry ->
+            val viewModel: HomeViewModel = viewModel(entry)
             HomeScreen(
+                viewModel = viewModel,
                 onRoundTripClick = { navController.navigate("roundtrip_flow") },
-                onScenicRouteClick = { navController.navigate("scenic_flow") }
+                onScenicRouteClick = { navController.navigate("scenic_flow") },
+                onRecentRouteClick = { routeId -> navController.navigate("recent_route_result/$routeId") }
+            )
+        }
+
+        composable(
+            route = "recent_route_result/{routeId}",
+            arguments = listOf(navArgument("routeId") { type = NavType.StringType })
+        ) { entry ->
+            val routeId = entry.arguments?.getString("routeId") ?: return@composable
+            RecentRouteResultScreen(
+                routeId = routeId,
+                onBack = { navController.popBackStack() }
             )
         }
 

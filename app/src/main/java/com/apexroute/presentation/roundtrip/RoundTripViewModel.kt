@@ -1,8 +1,10 @@
 package com.apexroute.presentation.roundtrip
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.apexroute.data.repository.RouteRepositoryImpl
+import com.apexroute.data.repository.RecentRoutesRepository
 import com.apexroute.domain.model.GeoPoint
 import com.apexroute.domain.usecase.GenerateRoundTripUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,9 +17,10 @@ import kotlinx.coroutines.launch
  * ViewModel for the Round Trip Generator flow.
  * Shared between RoundTripSetupScreen and RouteResultScreen.
  */
-class RoundTripViewModel : ViewModel() {
+class RoundTripViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = RouteRepositoryImpl()
+    private val recentRoutesRepo = RecentRoutesRepository(application)
     private val generateRoundTrip = GenerateRoundTripUseCase(repository)
 
     private val _uiState = MutableStateFlow(RoundTripUiState())
@@ -59,6 +62,7 @@ class RoundTripViewModel : ViewModel() {
 
                 result.fold(
                     onSuccess = { route ->
+                        recentRoutesRepo.saveRoute(route)
                         _uiState.update {
                             it.copy(isLoading = false, route = route, error = null)
                         }

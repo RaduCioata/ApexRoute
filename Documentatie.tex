@@ -266,10 +266,15 @@ for (edge in graph.getNeighbors(current.nodeId)) {
     if (edge.to in closedSet) continue
 
     // 1. Base hybrid pleasure-weighted cost
+    // The algorithm evaluates both the geometric curvature of the road and its functional class.
+    // Major highways (motorways, trunks) incur massive penalties (e.g., 5.0x cost multiplier) 
+    // to force the algorithm onto secondary and tertiary scenic roads.
     val baseCost = alpha * edge.distanceM - gamma * edge.curvatureScore * edge.distanceM
+    val typePenalty = getRoadTypePenalty(edge.roadType)
+    val weightedCost = baseCost * typePenalty
     
     // 2. Prevent negative costs
-    var effectiveCost = baseCost.coerceAtLeast(edge.distanceM * 0.1)
+    var effectiveCost = weightedCost.coerceAtLeast(edge.distanceM * 0.1)
 
     // 3. Heavy penalty if this edge was already used in a previous segment
     val edgeKey = Pair(current.nodeId, edge.to)
@@ -396,6 +401,9 @@ Furthermore, solid accent colors were replaced with vibrant linear gradients. Th
 \subsection{Typography Hierarchy}
 Typography was strictly enforced using a sans-serif typeface with highly distinct font weights. The hierarchy relies heavily on \texttt{FontWeight.ExtraBold} for primary metrics (such as the \textit{Pleasure Score}) to immediately draw the user's eye. Additionally, "overline" styles featuring tight letter-spacing (\texttt{labelSmall}) were introduced above large data points to provide context without cluttering the visual field.
 
+\subsection{Immersive Dashboard Architecture}
+The Home Screen was completely overhauled from a standard list of buttons into an immersive, premium dashboard. The hero section features a deep vertical gradient spanning the top of the screen, creating a subtle glowing aura behind the bold typography. The main routing functions are presented as large, full-width feature cards that utilize a "magazine-style" layout. These cards incorporate massive, semi-transparent decorative icons that bleed off the edge of the screen, alongside vibrant 8dp gradient strips that anchor the visual hierarchy.
+
 \subsection{Micro-Animations and State Transitions}
 Jetpack Compose's \texttt{animateFloatAsState} and \texttt{LaunchedEffect} APIs were heavily utilized to create a tactile feel:
 \begin{itemize}
@@ -406,6 +414,13 @@ Jetpack Compose's \texttt{animateFloatAsState} and \texttt{LaunchedEffect} APIs 
 
 \subsection{Map Visualization Enhancements}
 For the Scenic Route feature, which can now generate multiple alternative routes, the map visualization was upgraded. All alternatives are rendered simultaneously but are visually distinct. The selected route is drawn with full opacity, a thicker stroke width, and a glowing blur layer underneath. Unselected alternatives are drawn in the background with lower opacity and thinner strokes. This allows users to easily compare geographical differences without context switching.
+
+\section{Recent Routes and External Navigation}
+To bridge the gap between route discovery and actual driving, two major features were introduced to the Home Screen dashboard:
+\begin{itemize}
+    \item \textbf{File-Based Persistence}: A \texttt{RecentRoutesRepository} was implemented to automatically cache the user's latest 10 generated routes. Instead of relying on a heavy SQL database (like Room), the routes are serialized into a lightweight JSON file (\texttt{recent\_routes.json}) stored in the application's internal memory. This ensures rapid load times on the Home Screen while providing permanent persistence across application restarts.
+    \item \textbf{Google Maps Intent Integration}: Because Google Maps enforces a strict limit on the number of waypoints passed via an external URL (and aggressively recalculates paths to find the fastest route), it is technically impossible to pass an entire 1000-point curvy geometry to it. As a highly functional workaround, ApexRoute implements a "waypoint sampling algorithm". When the user taps the "Start Trip in Google Maps" button, the system extracts the origin, destination, and exactly 8 evenly spaced "anchor points" along the curvy route. These anchor points are passed to the Google Maps Intent URI, heavily constraining Google's routing engine and forcing it to approximate the custom scenic path.
+\end{itemize}
 
 \chapter{Conclusions and Future Work}
 

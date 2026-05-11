@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +22,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.apexroute.core.theme.*
 import com.apexroute.domain.model.Route
 import com.apexroute.presentation.roundtrip.RoundTripViewModel
@@ -213,6 +218,8 @@ private fun RouteDetailsCard(route: Route) {
         label = "pleasureProgress"
     )
 
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -277,7 +284,56 @@ private fun RouteDetailsCard(route: Route) {
                 MetricItem("Duration", "${route.estimatedDurationMin} min")
                 MetricItem("Curves", "${route.curveCount}")
             }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = { openGoogleMapsWithWaypoints(context, route) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Navigate with Google Maps", 
+                    style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
+                    maxLines = 1
+                )
+            }
         }
+    }
+}
+
+private fun openGoogleMapsWithWaypoints(context: Context, route: Route) {
+    if (route.points.isEmpty()) return
+    
+    val maxWaypoints = 8
+    val origin = route.points.first()
+    val destination = route.points.last()
+    
+    val intermediates = if (route.points.size > 2) route.points.drop(1).dropLast(1) else emptyList()
+    val step = if (intermediates.isNotEmpty()) maxOf(1, intermediates.size / maxWaypoints) else 1
+    val sampledWaypoints = intermediates.filterIndexed { index, _ -> index % step == 0 }.take(maxWaypoints)
+    
+    val waypointsStr = sampledWaypoints.joinToString("|") { "${it.latitude},${it.longitude}" }
+    
+    val waypointsParam = if (waypointsStr.isNotEmpty()) "&waypoints=$waypointsStr" else ""
+    val uri = Uri.parse("https://www.google.com/maps/dir/?api=1" +
+        "&origin=${origin.latitude},${origin.longitude}" +
+        "&destination=${destination.latitude},${destination.longitude}" +
+        waypointsParam +
+        "&travelmode=driving"
+    )
+    
+    val intent = Intent(Intent.ACTION_VIEW, uri)
+    intent.setPackage("com.google.android.apps.maps")
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, uri))
     }
 }
 

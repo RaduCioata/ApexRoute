@@ -1,8 +1,10 @@
 package com.apexroute.presentation.scenic
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.apexroute.data.repository.RouteRepositoryImpl
+import com.apexroute.data.repository.RecentRoutesRepository
 import com.apexroute.domain.model.GeoPoint
 import com.apexroute.domain.usecase.GenerateScenicRouteUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,9 +13,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ScenicRouteViewModel : ViewModel() {
+class ScenicRouteViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = RouteRepositoryImpl()
+    private val recentRoutesRepo = RecentRoutesRepository(application)
     private val generateScenic = GenerateScenicRouteUseCase(repository)
 
     private val _uiState = MutableStateFlow(ScenicRouteUiState())
@@ -42,7 +45,10 @@ class ScenicRouteViewModel : ViewModel() {
             try {
                 val result = generateScenic(a, b)
                 result.fold(
-                    onSuccess = { routes -> _uiState.update { it.copy(isLoading = false, routes = routes, selectedRouteIndex = 0) } },
+                    onSuccess = { routes ->
+                        routes.firstOrNull()?.let { recentRoutesRepo.saveRoute(it) }
+                        _uiState.update { it.copy(isLoading = false, routes = routes, selectedRouteIndex = 0) }
+                    },
                     onFailure = { err -> _uiState.update { it.copy(isLoading = false, error = err.message ?: "Error") } }
                 )
             } catch (e: Exception) {

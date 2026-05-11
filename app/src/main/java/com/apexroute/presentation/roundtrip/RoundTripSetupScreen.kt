@@ -446,7 +446,7 @@ private fun generatePickerHtml(center: GeoPoint): String {
 <style>*{margin:0;padding:0}body{background:#121212}#map{position:absolute;top:0;bottom:0;width:100%}.mapboxgl-ctrl-attrib{display:none!important}</style>
 </head><body><div id="map"></div>
 <script>
-mapboxgl.accessToken='$MAPBOX_TOKEN';
+mapboxgl.accessToken='$accessToken';
 var map=new mapboxgl.Map({container:'map',style:'mapbox://styles/mapbox/dark-v11',center:[${center.longitude},${center.latitude}],zoom:11,attributionControl:false});
 var marker=new mapboxgl.Marker({color:'#F9A826'}).setLngLat([${center.longitude},${center.latitude}]).addTo(map);
 map.on('click',function(e){
@@ -678,7 +678,7 @@ private data class GeocodingResult(
 private suspend fun geocode(query: String): List<GeocodingResult> = withContext(Dispatchers.IO) {
     val encoded = URLEncoder.encode(query, "UTF-8")
     val url = "https://api.mapbox.com/geocoding/v5/mapbox.places/$encoded.json" +
-            "?access_token=$MAPBOX_TOKEN&limit=5&language=ro"
+            "?access_token=$accessToken&limit=5&language=ro"
     val text = URL(url).readText()
     val json = JSONObject(text)
     val features = json.getJSONArray("features")

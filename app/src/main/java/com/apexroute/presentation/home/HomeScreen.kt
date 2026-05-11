@@ -1,111 +1,189 @@
 package com.apexroute.presentation.home
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.apexroute.core.theme.*
+import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    viewModel: HomeViewModel,
     onRoundTripClick: () -> Unit = {},
-    onScenicRouteClick: () -> Unit = {}
+    onScenicRouteClick: () -> Unit = {},
+    onRecentRouteClick: (String) -> Unit = {}
 ) {
+    val recentRoutes by viewModel.recentRoutes.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadRecentRoutes()
+    }
+    // Entrance animation state
+    var isVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(100)
+        isVisible = true
+    }
+
+    val alphaAnim by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "alpha"
+    )
+
+    val slideAnim by animateFloatAsState(
+        targetValue = if (isVisible) 0f else 50f,
+        animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+        label = "slide"
+    )
+
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        "ApexRoute", 
-                        style = Typography.titleLarge,
-                        color = Primary
-                    ) 
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        },
-        containerColor = BackgroundDark
+        containerColor = BackgroundDark,
+        modifier = Modifier.fillMaxSize()
     ) { paddingValues ->
-        // Premium gradient mesh background effect
         Box(modifier = Modifier.fillMaxSize()) {
+            // Background ambient glow
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp)
+                    .height(400.dp)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(Primary.copy(alpha = 0.15f), Color.Transparent)
                         )
                     )
             )
-            
-            Column(
+
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                    .graphicsLayer {
+                        alpha = alphaAnim
+                        translationY = slideAnim
+                    },
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(32.dp)
             ) {
-                Text(
-                    text = "Welcome back, Driver",
-                    style = Typography.titleMedium,
-                    color = TextPrimary
-                )
-                
-                Text(
-                    text = "Where would you like to drive today? Choose a route type that maximizes your pleasure.",
-                    style = Typography.bodyLarge,
-                    color = TextSecondary
-                )
+                // Hero Section
+                item {
+                    Column {
+                        Text(
+                            text = "ApexRoute",
+                            style = Typography.headlineLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 40.sp
+                            ),
+                            color = Primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Welcome back, Driver.",
+                            style = Typography.titleLarge,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Where will the road take you today?",
+                            style = Typography.bodyLarge,
+                            color = TextSecondary
+                        )
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Route Actions
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            text = "GENERATE A ROUTE",
+                            style = Typography.labelSmall,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
 
-                RouteOptionCard(
-                    title = "Round Trip Generator",
-                    description = "Input a duration (e.g., 60 min) and we will generate a circular route with the best curves.",
-                    icon = Icons.Default.Refresh,
-                    gradient = PrimaryGradient,
-                    onClick = onRoundTripClick
-                )
+                        FeatureCard(
+                            title = "Round Trip",
+                            subtitle = "Circular loop based on duration",
+                            icon = Icons.Default.Refresh,
+                            gradient = PrimaryGradient,
+                            onClick = onRoundTripClick
+                        )
 
-                RouteOptionCard(
-                    title = "Scenic Route A to B",
-                    description = "Navigate between two points optimized for winding roads and elevation.",
-                    icon = Icons.Default.LocationOn,
-                    gradient = SecondaryGradient,
-                    onClick = onScenicRouteClick
-                )
+                        FeatureCard(
+                            title = "Scenic Route",
+                            subtitle = "Point A to B via the best roads",
+                            icon = Icons.Default.LocationOn,
+                            gradient = SecondaryGradient,
+                            onClick = onScenicRouteClick
+                        )
+                    }
+                }
+
+                // Recent Routes
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            text = "RECENT ROUTES",
+                            style = Typography.labelSmall,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+
+                        if (recentRoutes.isEmpty()) {
+                            Text(
+                                text = "No recent routes yet. Generate one above!",
+                                style = Typography.bodyMedium,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        } else {
+                            recentRoutes.forEach { route ->
+                                RecentRouteCard(
+                                    title = if (route.curveCount > 50) "Curvy Adventure" else "Scenic Drive",
+                                    distance = String.format("%.1f km", route.totalDistanceKm),
+                                    duration = "${route.estimatedDurationMin}m",
+                                    score = (route.pleasureScore.toFloat()),
+                                    onClick = { onRecentRouteClick(route.id) }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun RouteOptionCard(
+fun FeatureCard(
     title: String,
-    description: String,
+    subtitle: String,
     icon: ImageVector,
     gradient: Brush,
     onClick: () -> Unit
@@ -117,46 +195,138 @@ fun RouteOptionCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .height(IntrinsicSize.Min)
             .scale(scale)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(28.dp))
             .background(SurfaceDark)
-            .border(1.dp, GlassBorder, RoundedCornerShape(24.dp))
+            .border(1.dp, GlassBorder, RoundedCornerShape(28.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
-            .padding(20.dp)
     ) {
+        // Decorative giant icon in the background
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.03f),
+            modifier = Modifier
+                .size(200.dp)
+                .align(Alignment.CenterEnd)
+                .offset(x = 60.dp, y = 20.dp)
+        )
+
+        // Gradient accent strip
+        Box(
+            modifier = Modifier
+                .width(8.dp)
+                .fillMaxHeight()
+                .align(Alignment.CenterStart)
+                .background(gradient)
+        )
+
         Row(
+            modifier = Modifier.padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(gradient),
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(gradient.apply { /* Just to use it as a solid background */ }),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.width(20.dp))
-            
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    style = Typography.titleMedium,
+                    style = Typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = description,
+                    text = subtitle,
                     style = Typography.bodyMedium,
                     color = TextSecondary
                 )
             }
+
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowRight,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun RecentRouteCard(
+    title: String,
+    distance: String,
+    duration: String,
+    score: Float,
+    onClick: () -> Unit = {}
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(SurfaceDark.copy(alpha = 0.5f))
+            .border(1.dp, GlassBorder, RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = null,
+                tint = Primary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = Typography.titleMedium,
+                color = TextPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "$distance • $duration",
+                style = Typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = score.toString(),
+                style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Primary
+            )
+            Text(
+                text = "Score",
+                style = Typography.bodySmall,
+                color = TextSecondary
+            )
         }
     }
 }
